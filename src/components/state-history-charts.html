@@ -1,4 +1,4 @@
-<link rel="import" href="../../bower_components/polymer/polymer-element.html">
+<link rel="import" href="../../bower_components/polymer/polymer.html">
 <link rel="import" href="../../bower_components/paper-spinner/paper-spinner.html">
 
 <link rel="import" href="../../bower_components/google-apis/google-legacy-loader.html">
@@ -11,14 +11,6 @@
     <link href="https://ajax.googleapis.com/ajax/static/modules/gviz/1.0/core/tooltip.css" rel="stylesheet" type="text/css">
     <style>
     :host {
-      display: block;
-    }
-
-    .google-visualization-tooltip {
-      z-index: 200;
-    }
-
-    state-history-chart-timeline, state-history-chart-line {
       display: block;
     }
 
@@ -48,16 +40,15 @@
 
       <state-history-chart-timeline
         data='[[historyData.timeline]]'
-        end-time='[[_computeEndTime(endTime, upToNow, historyData)]]'
-        no-single='[[noSingle]]'>
+        end-time='[[_computeEndTime(endTime, upToNow)]]'>
       </state-history-chart-timeline>
 
       <template is='dom-repeat' items='[[historyData.line]]'>
         <state-history-chart-line
           unit='[[item.unit]]'
           data='[[item.data]]'
-          is-single-device='[[_computeIsSingleLineChart(historyData, noSingle)]]'
-          end-time='[[_computeEndTime(endTime, upToNow, historyData)]]'>
+          is-single-device='[[_computeIsSingleLineChart(historyData)]]'
+          end-time='[[_computeEndTime(endTime, upToNow)]]'>
         </state-history-chart-line>
       </template>
     </template>
@@ -65,67 +56,65 @@
 </dom-module>
 
 <script>
-class StateHistoryCharts extends Polymer.Element {
-  static get is() { return 'state-history-charts'; }
-  static get properties() {
-    return {
-      historyData: {
-        type: Object,
-        value: null,
-      },
+Polymer({
+  is: 'state-history-charts',
 
-      isLoadingData: {
-        type: Boolean,
-        value: true,
-      },
+  properties: {
+    historyData: {
+      type: Object,
+      value: null,
+    },
 
-      endTime: {
-        type: Object,
-      },
+    isLoadingData: {
+      type: Boolean,
+      value: true,
+    },
 
-      upToNow: Boolean,
-      noSingle: Boolean,
+    endTime: {
+      type: Object,
+    },
 
-      _apiLoaded: {
-        type: Boolean,
-        value: false,
-      },
+    upToNow: {
+      type: Boolean,
+      value: false,
+    },
 
-      _isLoading: {
-        type: Boolean,
-        computed: '_computeIsLoading(isLoadingData, _apiLoaded)',
-      },
-    };
-  }
+    _apiLoaded: {
+      type: Boolean,
+      value: false,
+    },
 
-  _computeIsSingleLineChart(historyData, noSingle) {
-    return !noSingle && historyData && historyData.line.length === 1;
-  }
+    _isLoading: {
+      type: Boolean,
+      computed: '_computeIsLoading(isLoadingData, _apiLoaded)',
+    },
+  },
 
-  _googleApiLoaded() {
+  _computeIsSingleLineChart: function (historyData) {
+    return historyData && historyData.line.length === 1;
+  },
+
+  _googleApiLoaded: function () {
     window.google.load('visualization', '1', {
       packages: ['timeline', 'corechart'],
       callback: function () {
         this._apiLoaded = true;
       }.bind(this),
     });
-  }
+  },
 
-  _computeIsLoading(_isLoadingData, _apiLoaded) {
+  _computeIsLoading: function (_isLoadingData, _apiLoaded) {
     return _isLoadingData || !_apiLoaded;
-  }
+  },
 
-  _computeIsEmpty(historyData) {
+  _computeIsEmpty: function (historyData) {
     return (historyData &&
             historyData.timeline.length === 0 &&
             historyData.line.length === 0);
-  }
+  },
 
-  _computeEndTime(endTime, upToNow) {
-    // We don't really care about the value of historyData, but if it change we want to update
-    // endTime.
+  _computeEndTime: function (endTime, upToNow) {
     return upToNow ? new Date() : endTime;
-  }
-}
-customElements.define(StateHistoryCharts.is, StateHistoryCharts);
+  },
+});
 </script>

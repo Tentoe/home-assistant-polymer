@@ -1,43 +1,35 @@
-<link rel="import" href="../../bower_components/polymer/polymer-element.html">
+<link rel="import" href="../../bower_components/polymer/polymer.html">
 
 <script>
-{
-  const RECENT_THRESHOLD = 60000; // 1 minute
-  const RECENT_CACHE = {};
-  const DOMAINS_USE_LAST_UPDATED = ['thermostat', 'climate'];
-  const LINE_ATTRIBUTES_TO_KEEP = ['temperature', 'current_temperature', 'target_temp_low', 'target_temp_high'];
-  window.stateHistoryCache = window.stateHistoryCache || {};
+(function () {
+  var RECENT_THRESHOLD = 60000; // 1 minute
+  var RECENT_CACHE = {};
 
   function computeHistory(stateHistory) {
-    const lineChartDevices = {};
-    const timelineDevices = [];
+    var lineChartDevices = {};
+    var timelineDevices = [];
+    var unitStates;
 
     if (!stateHistory) {
       return { line: [], timeline: [] };
     }
 
-    stateHistory.forEach((stateInfo) => {
-      if (stateInfo.length === 0) {
+    stateHistory.forEach(function (stateInfo) {
+      var stateWithUnit;
+      var unit;
+
+      if (stateInfo.size === 0) {
         return;
       }
 
-      const stateWithUnit = stateInfo.find(
-        state => 'unit_of_measurement' in state.attributes);
+      stateWithUnit = stateInfo.find(
+        function (state) { return 'unit_of_measurement' in state.attributes; });
 
-      const unit = stateWithUnit ?
+      unit = stateWithUnit ?
         stateWithUnit.attributes.unit_of_measurement : false;
 
       if (!unit) {
-        timelineDevices.push({
-          name: window.hassUtil.computeStateName(stateInfo[0]),
-          entity_id: stateInfo[0].entity_id,
-          data: stateInfo
-            .map(state => ({ state: state.state, last_changed: state.last_changed }))
-            .filter((element, index, arr) => {
-              if (index === 0) return true;
-              return element.state !== arr[index - 1].state;
-            })
-        });
+        timelineDevices.push(stateInfo);
       } else if (unit in lineChartDevices) {
         lineChartDevices[unit].push(stateInfo);
       } else {
@@ -45,295 +37,135 @@
       }
     });
 
-    const unitStates = Object.keys(lineChartDevices).map(
-      unit => ({
-        unit: unit,
-        data: lineChartDevices[unit].map((states) => {
-          const last = states[states.length - 1];
-          const domain = window.hassUtil.computeDomain(last);
-          return {
-            domain: domain,
-            name: window.hassUtil.computeStateName(last),
-            entity_id: last.entity_id,
-            states: states.map((state) => {
-              const result = {
-                state: state.state,
-                last_changed: state.last_changed,
-              };
-              if (DOMAINS_USE_LAST_UPDATED.indexOf(domain) !== -1) {
-                result.last_changed = state.last_updated;
-              }
-              LINE_ATTRIBUTES_TO_KEEP.forEach((attr) => {
-                if (attr in state.attributes) {
-                  result.attributes = result.attributes || {};
-                  result.attributes[attr] = state.attributes[attr];
-                }
-              });
-              return result;
-            })
-          };
-        }),
-      }));
+    unitStates = Object.keys(lineChartDevices).map(
+      function (unit) {
+        return { unit: unit, data: lineChartDevices[unit] };
+      });
 
-    return {
-      line: unitStates, timeline: timelineDevices };
+    return { line: unitStates, timeline: timelineDevices };
   }
 
-  class HaStateHistoryData extends Polymer.Element {
-    static get is() { return 'ha-state-history-data'; }
-    static get properties() {
-      return {
-        hass: {
-          type: Object,
-          observer: 'hassChanged',
-        },
+  Polymer({
+    is: 'ha-state-history-data',
 
-        filterType: String,
+    properties: {
+      hass: {
+        type: Object,
+        observer: 'hassChanged',
+      },
 
-        cacheConfig: Object,
+      filterType: {
+        type: String,
+      },
 
-        startTime: Date,
-        endTime: Date,
+      startTime: {
+        type: Date,
+        value: null,
+      },
 
-        entityId: String,
+      endTime: {
+        type: Date,
+        value: null,
+      },
 
-        isLoading: {
-          type: Boolean,
-          value: true,
-          readOnly: true,
-          notify: true,
-        },
+      entityId: {
+        type: String,
+        value: null,
+      },
 
-        data: {
-          type: Object,
-          value: null,
-          readOnly: true,
-          notify: true,
-        },
-      };
-    }
+      isLoading: {
+        type: Boolean,
+        value: true,
+        readOnly: true,
+        notify: true,
+      },
 
-    static get observers() {
-      return [
-        'filterChanged(filterType, entityId, startTime, endTime, cacheConfig)',
-      ];
-    }
+      data: {
+        type: Object,
+        value: null,
+        readOnly: true,
+        notify: true,
+      },
+    },
 
-    disconnectedCallback() {
-      if (this._refreshTimeoutId) {
-        window.clearInterval(this._refreshTimeoutId);
-        this._refreshTimeoutId = null;
+    observers: [
+      'filterChanged(filterType, entityId, startTime, endTime)',
+    ],
+
+    hassChanged: function (newHass, oldHass) {
+      if (!oldHass) {
+        this.filterChanged(this.filterType, this.entityId, this.startTime, this.endTime);
       }
-      super.disconnectedCallback();
-    }
+    },
 
-    hassChanged(newHass, oldHass) {
-      if (!oldHass && !this._madeFirstCall) {
-        this.filterChanged(this.filterType, this.entityId, this.startTime, this.endTime,
-                           this.cacheConfig);
-      }
-    }
-
-    filterChanged(filterType, entityId, startTime, endTime, cacheConfig) {
+    filterChanged: function (filterType, entityId, startTime, endTime) {
       if (!this.hass) return;
-      this._madeFirstCall = true;
-      let data;
+
+      var data;
 
       if (filterType === 'date') {
-        if (!startTime || !endTime) return;
+        if (startTime === null || endTime === null) return;
         data = this.getDate(startTime, endTime);
       } else if (filterType === 'recent-entity') {
-        if (!entityId) return;
-        if (cacheConfig) {
-          data = this.getRecentWithCacheRefresh(entityId, cacheConfig);
-        } else {
-          data = this.getRecent(entityId, startTime, endTime);
-        }
+        if (entityId === null) return;
+        data = this.getRecent(entityId);
       } else {
         return;
       }
 
       this._setIsLoading(true);
 
-      data.then((stateHistory) => {
+      data.then(function (stateHistory) {
         this._setData(stateHistory);
         this._setIsLoading(false);
-      });
-    }
+      }.bind(this));
+    },
 
-    getEmptyCache() {
-      return {
-        prom: Promise.resolve({ line: [], timeline: [] }),
-        data: { line: [], timeline: [] },
-      };
-    }
-
-    getRecentWithCacheRefresh(entityId, cacheConfig) {
-      if (this._refreshTimeoutId) {
-        window.clearInterval(this._refreshTimeoutId);
-      }
-      if (cacheConfig.refresh) {
-        this._refreshTimeoutId = window.setInterval(() => {
-          this.getRecentWithCache(entityId, cacheConfig)
-            .then((stateHistory) => {
-              this._setData(Object.assign({}, stateHistory));
-            });
-        }, cacheConfig.refresh * 1000);
-      }
-      return this.getRecentWithCache(entityId, cacheConfig);
-    }
-
-    mergeLine(historyLines, cacheLines) {
-      historyLines.forEach((line) => {
-        const unit = line.unit;
-        const oldLine = cacheLines.find(cacheLine => cacheLine.unit === unit);
-        if (oldLine) {
-          line.data.forEach((entity) => {
-            const oldEntity =
-                oldLine.data.find(cacheEntity => entity.entity_id === cacheEntity.entity_id);
-            if (oldEntity) {
-              oldEntity.states = oldEntity.state.concat(entity.states);
-            } else {
-              oldLine.data.push(entity);
-            }
-          });
-        } else {
-          cacheLines.push(line);
-        }
-      });
-    }
-
-    mergeTimeline(historyTimelines, cacheTimelines) {
-      historyTimelines.forEach((timeline) => {
-        const oldTimeline =
-            cacheTimelines.find(cacheTimeline => cacheTimeline.entity_id === timeline.entity_id);
-        if (oldTimeline) {
-          oldTimeline.data = oldTimeline.data.concat(timeline.data);
-        } else {
-          cacheTimelines.push(timeline);
-        }
-      });
-    }
-
-    pruneArray(originalStartTime, arr) {
-      if (arr.length === 0) return arr;
-      const changedAfterStartTime = arr.findIndex((state) => {
-        const lastChanged = new Date(state.last_changed);
-        return lastChanged > originalStartTime;
-      });
-      if (changedAfterStartTime === 0) {
-        // If all changes happened after originalStartTime then we are done.
-        return arr;
-      }
-
-      // If all changes happened at or before originalStartTime. Use last index.
-      const updateIndex = changedAfterStartTime === -1 ? arr.length - 1 : changedAfterStartTime - 1;
-      arr[updateIndex].last_changed = originalStartTime;
-      return arr.slice(updateIndex);
-    }
-
-    pruneStartTime(originalStartTime, cacheData) {
-      cacheData.line.forEach((line) => {
-        line.data.forEach((entity) => {
-          entity.states = this.pruneArray(originalStartTime, entity.states);
-        });
-      });
-
-      cacheData.timeline.forEach((timeline) => {
-        timeline.data = this.pruneArray(originalStartTime, timeline.data);
-      });
-    }
-
-    getRecentWithCache(entityId, cacheConfig) {
-      const cacheKey = cacheConfig.cacheKey;
-      const endTime = new Date();
-      const originalStartTime = new Date(endTime);
-      originalStartTime.setHours(originalStartTime.getHours() - cacheConfig.hoursToShow);
-      let startTime = originalStartTime;
-      let appendingToCache = false;
-      let cache = window.stateHistoryCache[cacheKey];
-      if (cache && startTime >= cache.startTime && startTime <= cache.endTime) {
-        startTime = cache.endTime;
-        appendingToCache = true;
-        if (endTime <= cache.endTime) {
-          return cache.prom;
-        }
-      } else {
-        cache = window.stateHistoryCache[cacheKey] = this.getEmptyCache();
-      }
-      // Use Promise.all in order to make sure the old and the new fetches have both completed.
-      const prom = Promise.all([cache.prom,
-        this.fetchRecent(entityId, startTime, endTime, appendingToCache)])
-        // Use only data from the new fetch. Old fetch is already stored in cache.data
-        .then(oldAndNew => oldAndNew[1])
-        // Convert data into format state-history-chart-* understands.
-        .then(stateHistory => computeHistory(stateHistory))
-        // Merge old and new.
-        .then((stateHistory) => {
-          this.mergeLine(stateHistory.line, cache.data.line);
-          this.mergeTimeline(stateHistory.timeline, cache.data.timeline);
-          if (appendingToCache) {
-            this.pruneStartTime(originalStartTime, cache.data);
-          }
-          return cache.data;
-        })
-        .catch(() => {
-          window.stateHistoryCache[cacheKey] = undefined;
-        });
-      cache.prom = prom;
-      cache.startTime = originalStartTime;
-      cache.endTime = endTime;
-      return prom;
-    }
-
-    getRecent(entityId, startTime, endTime) {
-      const cacheKey = entityId;
-      const cache = RECENT_CACHE[cacheKey];
+    getRecent: function (entityId) {
+      var cache = RECENT_CACHE[entityId];
 
       if (cache && Date.now() - cache.created < RECENT_THRESHOLD) {
         return cache.data;
       }
 
-      const prom = this.fetchRecent(entityId, startTime, endTime).then(
-        stateHistory => computeHistory(stateHistory),
-        () => {
+      var url = 'history/period';
+
+      if (entityId) {
+        url += '?filter_entity_id=' + entityId;
+      }
+
+      var prom = this.hass.callApi('GET', url).then(
+        function (stateHistory) {
+          return computeHistory(stateHistory);
+        },
+        function () {
           RECENT_CACHE[entityId] = false;
           return null;
-        });
+        }
+      );
 
-      RECENT_CACHE[cacheKey] = {
+      RECENT_CACHE[entityId] = {
         created: Date.now(),
         data: prom,
       };
-      return prom;
-    }
-
-    fetchRecent(entityId, startTime, endTime, skipInitialState = false) {
-      let url = 'history/period';
-      if (startTime) {
-        url += '/' + startTime.toISOString();
-      }
-      url += '?filter_entity_id=' + entityId;
-      if (endTime) {
-        url += '&end_time=' + endTime.toISOString();
-      }
-      if (skipInitialState) {
-        url += '&skip_initial_state';
-      }
-
-      return this.hass.callApi('GET', url);
-    }
-
-    getDate(startTime, endTime) {
-      const filter = startTime.toISOString() + '?end_time=' + endTime.toISOString();
-
-      const prom = this.hass.callApi('GET', 'history/period/' + filter).then(
-        stateHistory => computeHistory(stateHistory),
-        () => null);
 
       return prom;
-    }
-  }
-  customElements.define(HaStateHistoryData.is, HaStateHistoryData);
-}
+    },
+
+    getDate: function (startTime, endTime) {
+      var filter = startTime.toISOString() + '?end_time=' + endTime.toISOString();
+
+      var prom = this.hass.callApi('GET', 'history/period/' + filter).then(
+        function (stateHistory) {
+          return computeHistory(stateHistory);
+        },
+        function () {
+          return null;
+        }
+      );
+
+      return prom;
+    },
+  });
+}());
 </script>

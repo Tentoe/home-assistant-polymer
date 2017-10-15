@@ -17,6 +17,7 @@
 
 <script>
 class StateCardContent extends Polymer.Element {
+
   static get is() { return 'state-card-content'; }
 
   static get properties() {
@@ -53,8 +54,7 @@ class StateCardContent extends Polymer.Element {
         hass: hass,
         stateObj: stateObj,
         inDialog: inDialog,
-      }
-    );
+      });
   }
 }
 customElements.define(StateCardContent.is, StateCardContent);

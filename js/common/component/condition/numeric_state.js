@@ -11,9 +11,7 @@ export default class NumericStateCondition extends Component {
 
   /* eslint-disable camelcase */
   render({ condition }) {
-    const {
-      value_template, entity_id, below, above
-    } = condition;
+    const { value_template, entity_id, below, above } = condition;
     return (
       <div>
         <paper-input

@@ -119,7 +119,8 @@ Polymer({
   },
 
   automationTapped: function (ev) {
-    history.pushState(null, null, '/config/automation/edit/' + this.automations[ev.model.index].attributes.id);
+    history.pushState(
+      null, null, '/config/automation/edit/' + this.automations[ev.model.index].attributes.id);
     this.fire('location-changed');
   },
 

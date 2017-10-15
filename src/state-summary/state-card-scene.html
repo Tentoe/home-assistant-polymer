@@ -49,8 +49,7 @@ Polymer({
     ev.stopPropagation();
     this.hass.callService(
       'scene', 'turn_on',
-      { entity_id: this.stateObj.entity_id }
-    );
+      { entity_id: this.stateObj.entity_id });
   },
 });
 </script>

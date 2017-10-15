@@ -57,9 +57,10 @@
       if (!stateObj) {
         return [];
       }
-      return Object.keys(stateObj.attributes).filter(function (key) {
-        return filtersArray.indexOf(key) === -1;
-      });
+      return Object.keys(stateObj.attributes).filter(
+        function (key) {
+          return filtersArray.indexOf(key) === -1;
+        });
     },
 
     formatAttribute: function (attribute) {

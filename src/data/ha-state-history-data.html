@@ -21,7 +21,8 @@
         return;
       }
 
-      const stateWithUnit = stateInfo.find(state => 'unit_of_measurement' in state.attributes);
+      const stateWithUnit = stateInfo.find(
+        state => 'unit_of_measurement' in state.attributes);
 
       const unit = stateWithUnit ?
         stateWithUnit.attributes.unit_of_measurement : false;
@@ -44,36 +45,38 @@
       }
     });
 
-    const unitStates = Object.keys(lineChartDevices).map(unit => ({
-      unit: unit,
-      data: lineChartDevices[unit].map((states) => {
-        const last = states[states.length - 1];
-        const domain = window.hassUtil.computeDomain(last);
-        return {
-          domain: domain,
-          name: window.hassUtil.computeStateName(last),
-          entity_id: last.entity_id,
-          states: states.map((state) => {
-            const result = {
-              state: state.state,
-              last_changed: state.last_changed,
-            };
-            if (DOMAINS_USE_LAST_UPDATED.indexOf(domain) !== -1) {
-              result.last_changed = state.last_updated;
-            }
-            LINE_ATTRIBUTES_TO_KEEP.forEach((attr) => {
-              if (attr in state.attributes) {
-                result.attributes = result.attributes || {};
-                result.attributes[attr] = state.attributes[attr];
+    const unitStates = Object.keys(lineChartDevices).map(
+      unit => ({
+        unit: unit,
+        data: lineChartDevices[unit].map((states) => {
+          const last = states[states.length - 1];
+          const domain = window.hassUtil.computeDomain(last);
+          return {
+            domain: domain,
+            name: window.hassUtil.computeStateName(last),
+            entity_id: last.entity_id,
+            states: states.map((state) => {
+              const result = {
+                state: state.state,
+                last_changed: state.last_changed,
+              };
+              if (DOMAINS_USE_LAST_UPDATED.indexOf(domain) !== -1) {
+                result.last_changed = state.last_updated;
               }
-            });
-            return result;
-          })
-        };
-      }),
-    }));
+              LINE_ATTRIBUTES_TO_KEEP.forEach((attr) => {
+                if (attr in state.attributes) {
+                  result.attributes = result.attributes || {};
+                  result.attributes[attr] = state.attributes[attr];
+                }
+              });
+              return result;
+            })
+          };
+        }),
+      }));
 
-    return { line: unitStates, timeline: timelineDevices };
+    return {
+      line: unitStates, timeline: timelineDevices };
   }
 
   class HaStateHistoryData extends Polymer.Element {
@@ -126,10 +129,8 @@
 
     hassChanged(newHass, oldHass) {
       if (!oldHass && !this._madeFirstCall) {
-        this.filterChanged(
-          this.filterType, this.entityId, this.startTime, this.endTime,
-          this.cacheConfig
-        );
+        this.filterChanged(this.filterType, this.entityId, this.startTime, this.endTime,
+                           this.cacheConfig);
       }
     }
 
@@ -298,8 +299,7 @@
         () => {
           RECENT_CACHE[entityId] = false;
           return null;
-        }
-      );
+        });
 
       RECENT_CACHE[cacheKey] = {
         created: Date.now(),
@@ -329,8 +329,7 @@
 
       const prom = this.hass.callApi('GET', 'history/period/' + filter).then(
         stateHistory => computeHistory(stateHistory),
-        () => null
-      );
+        () => null);
 
       return prom;
     }

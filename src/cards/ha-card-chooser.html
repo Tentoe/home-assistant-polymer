@@ -22,10 +22,8 @@ Polymer({
   cardDataChanged: function (newData) {
     if (!newData) return;
 
-    window.hassUtil.dynamicContentUpdater(
-      this, 'HA-' + newData.cardType.toUpperCase() + '-CARD',
-      newData
-    );
+    window.hassUtil.dynamicContentUpdater(this, 'HA-' + newData.cardType.toUpperCase() + '-CARD',
+                          newData);
   },
 });
 </script>

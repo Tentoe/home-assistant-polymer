@@ -176,21 +176,16 @@
         value: false,
       },
 
-      orderedGroups: {
-        type: Array,
-      },
-
       cards: {
         type: Object,
       },
     },
 
     observers: [
-      'updateCards(columns, states, showIntroduction, panelVisible, viewVisible, orderedGroups)',
+      'updateCards(columns, states, showIntroduction, panelVisible, viewVisible)',
     ],
 
-    updateCards: function (columns, states, showIntroduction, panelVisible, viewVisible,
-      orderedGroups) {
+    updateCards: function (columns, states, showIntroduction, panelVisible, viewVisible) {
       /* eslint-disable no-console */
       if (!panelVisible || !viewVisible) {
         return;
@@ -199,12 +194,12 @@
         'updateCards', function () {
           // Things might have changed since it got scheduled.
           if (this.panelVisible && this.viewVisible) {
-            this.cards = this.computeCards(columns, states, showIntroduction, orderedGroups);
+            this.cards = this.computeCards(columns, states, showIntroduction);
           }
         }.bind(this), 10);
     },
 
-    computeCards: function (columns, states, showIntroduction, orderedGroups) {
+    computeCards: function (columns, states, showIntroduction) {
       var hass = this.hass;
 
       var cards = {
@@ -292,20 +287,14 @@
         });
       }
 
-      var splitted = window.HAWS.splitByGroups(states);
-      if (orderedGroups) {
-        splitted.groups.sort((gr1, gr2) => orderedGroups[gr1.entity_id] -
-          orderedGroups[gr2.entity_id]);
-      } else {
-        splitted.groups.sort((gr1, gr2) => gr1.attributes.order - gr2.attributes.order);
-      }
+      var sorted = window.HAWS.splitByGroups(states);
 
       var badgesColl = {};
       var beforeGroupColl = {};
       var afterGroupedColl = {};
 
-      Object.keys(splitted.ungrouped).forEach(function (key) {
-        var state = splitted.ungrouped[key];
+      Object.keys(sorted.ungrouped).forEach(function (key) {
+        var state = sorted.ungrouped[key];
         var domain = computeDomain(state);
 
         if (domain === 'a') {
@@ -343,7 +332,7 @@
         addEntitiesCard(domain.domain, domain.states);
       });
 
-      splitted.groups.forEach(function (groupState) {
+      sorted.groups.forEach(function (groupState) {
         var entities = window.HAWS.getGroupEntities(states, groupState);
         addEntitiesCard(
           groupState.entity_id,

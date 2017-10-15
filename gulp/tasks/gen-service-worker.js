@@ -13,7 +13,6 @@ TODO:
 */
 var gulp = require('gulp');
 var crypto = require('crypto');
-var file = require('gulp-file');
 var fs = require('fs');
 var path = require('path');
 var swPrecache = require('sw-precache');
@@ -54,50 +53,48 @@ function md5(filename) {
 }
 
 gulp.task('gen-service-worker', () => {
-  var genPromise = null;
-  if (DEV) {
-    var devBase = 'console.warn("Service worker caching disabled in development")';
-    genPromise = Promise.resolve(devBase);
-  } else {
-    // Create fingerprinted versions of our dependencies.
-    staticFingerprinted.forEach(fn => {
-      var parts = path.parse(fn);
-      var hash = md5(rootDir + '/' + parts.name + parts.ext);
-      var url = '/static/' + parts.name + '-' + hash + parts.ext;
-      var fpath = rootDir + '/' + parts.name + parts.ext;
-      dynamicUrlToDependencies[url] = [fpath];
-    });
+  // Create fingerprinted versions of our dependencies.
+  staticFingerprinted.forEach(fn => {
+    var parts = path.parse(fn);
+    var hash = md5(rootDir + '/' + parts.name + parts.ext);
+    var url = '/static/' + parts.name + '-' + hash + parts.ext;
+    var fpath = rootDir + '/' + parts.name + parts.ext;
+    dynamicUrlToDependencies[url] = [fpath];
+  });
 
-    panelsFingerprinted.forEach(panel => {
-      var fpath = panelDir + '/ha-panel-' + panel + '.html';
-      var hash = md5(fpath);
-      var url = '/frontend/panels/' + panel + '-' + hash + '.html';
-      dynamicUrlToDependencies[url] = [fpath];
-    });
+  panelsFingerprinted.forEach(panel => {
+    var fpath = panelDir + '/ha-panel-' + panel + '.html';
+    var hash = md5(fpath);
+    var url = '/frontend/panels/' + panel + '-' + hash + '.html';
+    dynamicUrlToDependencies[url] = [fpath];
+  });
 
-    var options = {
-      navigateFallback: '/',
-      navigateFallbackWhitelist: [/^((?!(static|api|local|service_worker.js|manifest.json)).)*$/],
-      dynamicUrlToDependencies: dynamicUrlToDependencies,
-      staticFileGlobs: [
-        rootDir + '/icons/favicon.ico',
-        rootDir + '/icons/favicon-192x192.png',
-        rootDir + '/webcomponents-lite.min.js',
-        rootDir + '/fonts/roboto/Roboto-Light.ttf',
-        rootDir + '/fonts/roboto/Roboto-Medium.ttf',
-        rootDir + '/fonts/roboto/Roboto-Regular.ttf',
-        rootDir + '/fonts/roboto/Roboto-Bold.ttf',
-        rootDir + '/images/card_media_player_bg.png',
-      ],
-      stripPrefix: '..',
-      replacePrefix: 'static',
-      verbose: true,
-    };
+  var options = {
+    navigateFallback: '/',
+    navigateFallbackWhitelist: [/^((?!(static|api|local|service_worker.js|manifest.json)).)*$/],
+    dynamicUrlToDependencies: dynamicUrlToDependencies,
+    staticFileGlobs: [
+      rootDir + '/icons/favicon.ico',
+      rootDir + '/icons/favicon-192x192.png',
+      rootDir + '/webcomponents-lite.min.js',
+      rootDir + '/fonts/roboto/Roboto-Light.ttf',
+      rootDir + '/fonts/roboto/Roboto-Medium.ttf',
+      rootDir + '/fonts/roboto/Roboto-Regular.ttf',
+      rootDir + '/fonts/roboto/Roboto-Bold.ttf',
+      rootDir + '/images/card_media_player_bg.png',
+    ],
+    stripPrefix: '..',
+    replacePrefix: 'static',
+    verbose: true,
+  };
 
-    genPromise = swPrecache.generate(options);
-  }
+  var devBase = 'console.warn("Service worker caching disabled in development")';
 
   var swHass = fs.readFileSync(path.resolve(__dirname, '../service-worker.js.tmpl'), 'UTF-8');
+
+  var genPromise = DEV ? Promise.resolve(devBase) : swPrecache.generate(options);
+
+  genPromise = genPromise.then(swString => swString + '\n' + swHass);
 
   // Fix this
   // if (!DEV) {
@@ -105,7 +102,9 @@ gulp.task('gen-service-worker', () => {
   //     swString => uglifyJS.minify(swString, { fromString: true }).code);
   // }
 
-  return genPromise.then(swString => swString + '\n' + swHass)
-    .then(swString => file('service_worker.js', swString)
-      .pipe(gulp.dest(config.build_dir)));
+  genPromise.then(swString => {
+    fs.writeFileSync(path.resolve(config.build_dir, 'service_worker.js'), swString);
+  });
+
+  return genPromise;
 });
